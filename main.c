@@ -3,6 +3,8 @@
  * Author: Chaitanya bhargav M
  *         Karl Krach (refactoring)
  * Source: http://linux-spawn.blogspot.de/2009/10/sending-arp-request-in-linux-using-c.html
+ * Tested: Debian GNU/Linux 8 (jessie), x86-64
+ *         Buildroot 2013.02, powerpc
  */
 
 #include "stdio.h"
