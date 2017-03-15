@@ -1,3 +1,9 @@
+/** Sends ARP request for given IP address
+ *
+ * Author: Chaitanya bhargav M
+ * Source: http://linux-spawn.blogspot.de/2009/10/sending-arp-request-in-linux-using-c.html
+ */
+
 #include "sys/socket.h"
 #include "sys/types.h"
 #include "stdio.h"
@@ -10,7 +16,7 @@
 #include "sys/ioctl.h"
 #include "netpacket/packet.h"
 #include "net/ethernet.h"
-#include "netdb.h
+#include "netdb.h"
 
 #define ETHER_TYPE_FOR_ARP 0x0806
 #define HW_TYPE_FOR_ETHER 0x0001
@@ -21,7 +27,7 @@
 
 typedef unsigned char byte1;
 typedef unsigned short int byte2;
-typedef unsigned long int byte4;
+typedef unsigned int byte4;
 
 // For Proper memory allocation in the structure
 #pragma pack(1)
@@ -58,7 +64,7 @@ int main(int argc, char *argv[])
 	
 	if( argc != 3 )
 	{
-		printf("Usage: ./arp \n");
+		printf("Usage: %s INTERFACE IP\n", argv[0]);
 		exit(1);
 	}
 	else if( getuid() && geteuid())
@@ -142,12 +148,12 @@ int main(int argc, char *argv[])
 	pkt.hw_size = HW_LEN_FOR_ETHER;
 	pkt.proto_size = HW_LEN_FOR_IP;
 	pkt.arp_opcode = htons(OP_CODE_FOR_ARP_REQ);
-	memcpy(pkt.sender_mac, pkt.src_mac, (6 * sizeof(byte1)));
+	memcpy(pkt.sender_mac, pkt.src_mac, sizeof(pkt.sender_mac));
 	pkt.sender_ip = htonl(ipAddr);
-	memset(pkt.target_mac, 0 , (6 * sizeof(byte1)));
+	memset(pkt.target_mac, 0 , sizeof(pkt.target_mac));
 	pkt.target_ip = inet_addr(argv[2]);
 	// Padding
-	memset(pkt.padding, 0 , 18 * sizeof(byte1));
+	memset(pkt.padding, 0 , 18);
 	
 	
 	// For sending the packet We need it!
@@ -162,6 +168,7 @@ int main(int argc, char *argv[])
 	sa.sll_family = AF_PACKET;
 	sa.sll_ifindex = ifr.ifr_ifindex;
 	sa.sll_protocol = htons(ETH_P_ARP);
+	sa.sll_halen = 0;
 	
 	/* Send it! */
 	retVal = sendto(arp_fd, &pkt, sizeof(pkt), 0,(struct sockaddr *)&sa, sizeof(sa));
@@ -192,3 +199,4 @@ int print_pkt(char *buf, int len)
 	printf("\n");
 	return 0;
 } 
+
