@@ -36,67 +36,70 @@ struct arp_packet
 
 int main(int argc, char *argv[])
 {
-	int arp_fd,if_fd,retVal;
-	struct sockaddr_in *sin;
-	struct sockaddr_ll sa;
+	int arp_fd, if_fd, retVal;
 	struct ifreq ifr;
-	struct arp_packet pkt;
-	uint32_t ipAddr;
+	uint32_t own_ip;
+	int if_index;
 	
-	if( argc != 3 )
-	{
+
+	if( argc != 3 ) {
 		printf("Usage: sudo %s INTERFACE IP\n", argv[0]);
 		printf("         INTERFACE    network interface, e.g. eth0\n");
 		printf("         IP           IP to resolve, e.g. 192.168.10.7\n");
 		exit(1);
 	}
-	else if( getuid() && geteuid())
-	{
+	else if( getuid() && geteuid()) {
 		printf("Oops!\nDude you need SuperUser rights!\n");
 		exit(1);
 	}
-	
-	/*=============================START of IP, MAC ADDRESS ACCESS========================*/
-	
-	/* Open socket for accessing the IPv4 address of specified Interface */
+
+
 	if_fd = socket(AF_INET, SOCK_STREAM, 0);
-	if( if_fd < 0 )
-	{
-		perror("IF Socket");
+	if( if_fd < 0 ) {
+		perror("IPv4 Socket");
 		exit(1);
 	}
-	
-	/* provide interface name to ifreq structure */
+
+	// get own IP address
 	memcpy(ifr.ifr_name, argv[1], IF_NAMESIZE);
-	/* IOCTL to get ip address */
 	retVal = ioctl(if_fd, SIOCGIFADDR, &ifr, sizeof(ifr));
+	if( retVal < 0 ) {
+		perror("SIOCGIFADDR");
+		exit(1);
+	}
+	struct sockaddr_in *sin = (struct sockaddr_in *)&ifr.ifr_addr;
+	own_ip = ntohl(sin->sin_addr.s_addr);
+
+
+	// get index of interface (e.g. eth0 -> 1)
+	retVal = ioctl(if_fd, SIOCGIFINDEX, &ifr, sizeof(ifr));
 	if( retVal < 0 ) {
 		perror("IOCTL");
 		exit(1);
 	}
-	
-	/* Simple typecasting for easy access to ip address */
-	sin = (struct sockaddr_in *)&ifr.ifr_addr;
-	ipAddr = ntohl(sin->sin_addr.s_addr);
+	if_index = ifr.ifr_ifindex;
 
-	
+
+	// get own MAC address
 	retVal = ioctl(if_fd, SIOCGIFHWADDR, &ifr, sizeof(ifr));
 	if( retVal < 0 ) {
 		perror("IOCTL");
 		exit(1);
 	}
-	
-	/*-----------------------------END of IP,MAC ADDRESS ACCESS------------------------*/
-	
-	/*=============================Start of ARP request sending====================*/
+
+	close(if_fd);
+
+
+
+
 	// Socket to send ARP packet
 	arp_fd = socket(PF_PACKET, SOCK_RAW, htons(ETH_P_ARP));
 	if( arp_fd == -1 ) {
-		perror("ARP Socket");
+		perror("RAW Socket");
 		exit(1);
 	}
-	//====================== Formulate the ARP Packet ============================
 
+	struct arp_packet pkt;
 	memset(pkt.ether.ether_dhost, 0xFF, sizeof(pkt.ether.ether_dhost));
 	memcpy(pkt.ether.ether_shost, ifr.ifr_hwaddr.sa_data, sizeof(pkt.ether.ether_dhost));
 	pkt.ether.ether_type = htons(ETHERTYPE_ARP);
@@ -108,25 +111,23 @@ int main(int argc, char *argv[])
 	pkt.arp.ar_op = htons(ARPOP_REQUEST);
 
 	memcpy(pkt.sender_mac, ifr.ifr_hwaddr.sa_data, sizeof(pkt.sender_mac));
-	pkt.sender_ip = htonl(ipAddr);
+	pkt.sender_ip = htonl(own_ip);
 	memset(pkt.target_mac, 0 , sizeof(pkt.target_mac));
 	pkt.target_ip = inet_addr(argv[2]);
 
 	memset(pkt.padding, 0 , sizeof(pkt.padding));
-	
-	
-	// For sending the packet We need it!
-	retVal = ioctl(if_fd, SIOCGIFINDEX, &ifr, sizeof(ifr));
-	if( retVal < 0 ) {
-		perror("IOCTL");
-		exit(1);
-	}
-	sa.sll_family = AF_PACKET;
-	sa.sll_ifindex = ifr.ifr_ifindex;
+
+
+	struct sockaddr_ll sa;
+	sa.sll_family   = AF_PACKET;
 	sa.sll_protocol = htons(ETH_P_ARP);
-	sa.sll_halen = 0;
-	
-	/* Send it! */
+	sa.sll_ifindex  = if_index;
+	sa.sll_hatype   = ARPHRD_ETHER;
+	sa.sll_pkttype  = PACKET_BROADCAST;
+	sa.sll_halen    = 0;
+	// sa.sll_addr not set
+
+
 	retVal = sendto(arp_fd, &pkt, sizeof(pkt), 0,(struct sockaddr *)&sa, sizeof(sa));
 	if( retVal < 0 ) {
 		perror("sendto");
@@ -134,8 +135,6 @@ int main(int argc, char *argv[])
 	}
 
 	close(arp_fd);
-	close(if_fd);
 
 	return 0;
 }
-
