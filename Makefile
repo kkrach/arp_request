@@ -6,13 +6,15 @@
 
 TARGET=arp_request
 SRCS=main.c
+CFLAGS=-Wall -Wextra -Werror -std=c99 -D_BSD_SOURCE
 
 CROSSCOMPILE=/opt/crosstool-ng-powerpc/bin/powerpc-e500v2-linux-gnuspe-
 
-default: $(TARGET)
+default: all
+all: $(TARGET)
 
 $(TARGET): $(SRCS)
-	$(CROSSCOMPILE)gcc -Wall $(SRCS) -o $(TARGET)
+	$(CROSSCOMPILE)gcc $(CFLAGS) $(SRCS) -o $(TARGET)
 
 clean:
 	rm -rf *.o $(TARGET)
