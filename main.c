@@ -1,6 +1,7 @@
 /** Sends ARP request for given IP address
  *
  * Author: Chaitanya bhargav M
+ *         Karl Krach (refactoring)
  * Source: http://linux-spawn.blogspot.de/2009/10/sending-arp-request-in-linux-using-c.html
  */
 
